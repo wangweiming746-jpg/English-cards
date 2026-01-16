@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的英文單字題庫 (完整版)</title>
+    <style>
+        :root { --primary: #4a90e2; --secondary: #27ae60; --bg: #f0f2f5; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; }
+        .nav { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .nav button { padding: 8px 20px; border-radius: 20px; border: 2px solid var(--primary); background: white; color: var(--primary); cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .nav button.active { background: var(--primary); color: white; }
+        
+        .container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; min-height: 300px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; position: relative; }
+        
+        /* 字卡樣式 */
+        .card-container { perspective: 1000px; width: 100%; height: 200px; cursor: pointer; }
+        .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; }
+        .card.flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 15px; background: #fff; border: 2px solid #f0f0f0; box-sizing: border-box; padding: 10px; }
+        .card-front { background: #fff; }
+        .card-back { transform: rotateY(180deg); background: #f8fbff; color: var(--primary); border-color: var(--primary); }
+        
+        .word-text { font-size: 32px; font-weight: 800; color: #333; margin-bottom: 5px; word-break: break-word; }
+        .pos-text { font-style: italic; color: #888; font-size: 18px; }
+        .trans-text { font-size: 28px; font-weight: bold; line-height: 1.4; }
+
+        /* 填空樣式 */
+        .cloze-box { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .hint-text { font-size: 24px; letter-spacing: 3px; font-family: monospace; color: #333; margin: 10px 0; font-weight: bold; }
+        input { padding: 12px; font-size: 20px; border: 2px solid #ddd; border-radius: 10px; width: 80%; text-align: center; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--primary); }
+        .correct { border-color: var(--secondary) !important; background: #e8f5e9; }
+        .wrong { border-color: #e74c3c !important; background: #ffebee; }
+
+        .footer-btns { margin-top: 25px; display: flex; gap: 15px; }
+        .btn-control { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 50px; cursor: pointer; font-size: 16px; box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3); transition: 0.2s; }
+        .btn-control:active { transform: scale(0.95); }
+        
+        #stats { font-size: 14px; color: #999; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="nav">
+        <button onclick="setMode('flashcard')" id="nav-flashcard" class="active">背單字 (字卡)</button>
+        <button onclick="setMode('cloze')" id="nav-cloze">考拼字 (填空)</button>
+    </div>
+
+    <div id="stats">載入中...</div>
+
+    <div class="container" id="game-container">
+        </div>
+
+    <div class="footer-btns">
+        <button class="btn-control" onclick="prev()">上一個</button>
+        <button class="btn-control" onclick="next()">下一個</button>
+        <button class="btn-control" onclick="shuffle()" style="background:#7f8c8d;">隨機洗牌</button>
+    </div>
+
+<script>
+    // 完整資料庫：共 132 個項目 (已核對所有照片)
+    const data = [
+        // === 照片 1 (1000008182) ===
+        {w:"superior", p:"adj.", t:"上等的"},
+        {w:"feature", p:"vt./n.", t:"由...主演；特徵"},
+        {w:"graduate", p:"adj.", t:"研究生的"},
+        {w:"measure", p:"vt./n.", t:"評估；措施"},
+        {w:"indicate", p:"vt.", t:"表明，指示"},
+        {w:"corresponding", p:"adj.", t:"相應的"},
+        {w:"correspond", p:"vi.", t:"符合，一致"},
+        {w:"expression", p:"n.", t:"表情，說法"},
+        {w:"interact", p:"vi.", t:"互動"},
+        {w:"prefer", p:"vt.", t:"更喜歡"},
+        {w:"frustrated", p:"adj.", t:"失意的，氣餒的"},
+        {w:"reform", p:"vt/vi/n.", t:"改良；改革/進"},
+        {w:"resistance", p:"n.", t:"抵抗力，阻力"},
+        {w:"efficiency", p:"n.", t:"效能，效率"},
+        {w:"manufacture", p:"vt.", t:"生產，製造"},
+        {w:"desire", p:"vt.", t:"渴望"},
+        {w:"resist", p:"vt/vi", t:"抗拒"},
+        {w:"ingredient", p:"n.", t:"成分，原料"},
+        {w:"gain", p:"vt/vi", t:"獲得，贏得"},
+        {w:"properly", p:"adv.", t:"正確地"},
+        {w:"content", p:"n.", t:"內容，滿足"},
+        {w:"preferably", p:"adv.", t:"最好是，更合適的"},
+        {w:"numerous", p:"adj.", t:"極多的"},
+        {w:"occasionally", p:"adv.", t:"偶爾"},
+        {w:"digest", p:"vt.", t:"消化，理解"},
+        {w:"reluctant", p:"adj.", t:"不情願的"},
+        {w:"dignity", p:"n.", t:"尊嚴，高尚"},
+        {w:"leather", p:"n.", t:"皮革"},
+        {w:"found", p:"vt.", t:"興建，創立"},
+        {w:"host", p:"n.", t:"主持人"},
+        {w:"poverty", p:"n.", t:"貧窮"},
+        {w:"situation", p:"n.", t:"情況，處境"},
+        {w:"devise", p:"vt.", t:"設計，策劃"},
+        {w:"device", p:"n.", t:"設備，方法"},
+        {w:"strategy", p:"n.", t:"策略"},
+        {w:"charge", p:"vi/n", t:"控告；費用"},
+        {w:"permanently", p:"adv.", t:"永久地"},
+        
+        // === 照片 2 (1000008183) ===
+        {w:"native", p:"adj.", t:"當地的"},
+        {w:"eliminate", p:"vt.", t:"消除，淘汰"},
+        {w:"introduce", p:"vt.", t:"引進，介紹"},
+        {w:"settler", p:"n.", t:"移民者"},
+        {w:"desperate", p:"adj.", t:"心急如焚的"},
+        {w:"altogether", p:"adv.", t:"完全地，總共"},
+        {w:"instinct", p:"n.", t:"本能"},
+        {w:"guard", p:"n.", t:"守衛，警衛"},
+        {w:"current", p:"n./adj.", t:"潮流；目前的"},
+        {w:"retirement", p:"n.", t:"退休"},
+        {w:"acquire", p:"vt.", t:"獲得，學到"},
+        {w:"endangered", p:"adj.", t:"瀕臨絕種的"},
+        {w:"enthusiasm", p:"n.", t:"熱心，熱忱"},
+        {w:"honor", p:"n./vt.", t:"榮譽；表揚"},
+        {w:"fortune", p:"n.", t:"運氣，財富"},
+        {w:"wealth", p:"n.", t:"財富"},
+        {w:"plentiful", p:"adj.", t:"豐富的"},
+        {w:"magnificent", p:"adj.", t:"極好的，出色的"},
+        {w:"mystery", p:"n.", t:"神秘，謎"},
+        {w:"regularly", p:"adj.", t:"經常、有規律地"},
+        {w:"devote", p:"vt.", t:"付出，奉獻"},
+        {w:"role", p:"n.", t:"職責，角色"},
+        {w:"ordinary", p:"adj.", t:"平凡的，普通的"},
+        {w:"accept", p:"vt.", t:"接受，認可"},
+        {w:"force", p:"n.", t:"力量，軍隊"},
+        {w:"afterwards", p:"adv.", t:"之後，後來"},
+        {w:"assure", p:"vt.", t:"確保，保證"},
+        {w:"reliable", p:"adj.", t:"可靠的，信賴的"},
+        {w:"obtain", p:"vt.", t:"獲得，得到"},
+        {w:"witness", p:"n.", t:"目擊者，見證"},
+        {w:"court", p:"n.", t:"法庭，球場"},
+        {w:"convince", p:"vt.", t:"使確信，說服"},
+        {w:"reasonable", p:"adj.", t:"合理的"},
+        {w:"doubt", p:"n./vt.", t:"懷疑；不相信"},
+        {w:"fate", p:"n.", t:"命運，際遇"},
+        {w:"guilty", p:"adj.", t:"有罪的，內疚的"},
+
+        // === 照片 3 (1000008184) ===
+        {w:"anxious", p:"adj.", t:"緊張不安的"},
+        {w:"tease", p:"v.", t:"逗弄，捉弄"},
+        {w:"communicate", p:"v.", t:"溝通"},
+        {w:"reduce", p:"v.", t:"減少，降低"},
+        {w:"represent", p:"v.", t:"代表，象徵"},
+        {w:"stadium", p:"n.", t:"體育場"},
+        {w:"insult", p:"n.", t:"侮辱，辱罵"},
+        {w:"oppose", p:"v.", t:"使對立"},
+        {w:"motivation", p:"n.", t:"動力，動機"},
+        {w:"tough", p:"adj.", t:"困難的"},
+        {w:"criticize", p:"v.", t:"批評"},
+        {w:"permission", p:"n.", t:"允許，許可"},
+        {w:"significance", p:"n.", t:"重要性"},
+        {w:"striped", p:"adj.", t:"有條紋的"},
+        {w:"confuse", p:"v.", t:"混淆"},
+        {w:"contrast", p:"n.", t:"對比"},
+        {w:"contrary", p:"n.", t:"相反"},
+        {w:"remarkable", p:"adj.", t:"非凡的"},
+        {w:"charm", p:"adj.", t:"迷人的"},
+        {w:"casual", p:"adj.", t:"休閒的"},
+        {w:"transform", p:"v.", t:"使轉換"},
+        {w:"spoil", p:"v.", t:"弄糟，溺愛"},
+        {w:"generation", p:"n.", t:"世代"},
+        {w:"emperor", p:"n.", t:"皇帝"},
+        {w:"meanwhile", p:"adv.", t:"同時"},
+        {w:"ideal", p:"adj.", t:"理想的"},
+        {w:"spirit", p:"n.", t:"精神，氣氛"},
+        {w:"chimney", p:"n.", t:"煙囪"},
+        {w:"license", p:"n.", t:"執照，許可證"},
+        {w:"extend", p:"v.", t:"延伸，擴張"},
+        {w:"multiple", p:"adj.", t:"多個的"},
+        {w:"attitude", p:"n.", t:"態度，心態"},
+        {w:"inspire", p:"v.", t:"啟發"},
+        {w:"immediately", p:"adv.", t:"立刻"},
+        {w:"request", p:"n.", t:"請求，要求"},
+        {w:"intend", p:"v.", t:"計畫"},
+        {w:"frightening", p:"adj.", t:"駭人的"},
+        {w:"panic", p:"n.", t:"恐慌"},
+        {w:"contribute", p:"v.", t:"促使，導致"},
+        {w:"grand", p:"adj.", t:"宏偉的"},
+
+        // === 照片 4 & 5 (1000008185/6) ===
+        {w:"precious", p:"adj.", t:"珍貴的"},
+        {w:"unwrap", p:"v.", t:"拆開"},
+        {w:"eagerly", p:"adv.", t:"急切地"},
+        {w:"informative", p:"adj.", t:"增廣見聞的"},
+        {w:"absolutely", p:"adv.", t:"肯定，絕對地"},
+        {w:"significant", p:"adj.", t:"重要的"},
+        {w:"revenge", p:"n.", t:"報仇，報復"},
+        {w:"suffer", p:"v.", t:"受苦"},
+        {w:"split", p:"v.", t:"(使)分開"},
+        {w:"satellite", p:"n.", t:"人造衛星"},
+        {w:"slight", p:"adj.", t:"微小的"},
+        {w:"instruct", p:"v.", t:"指示，命令"},
+        {w:"mysterious", p:"adj.", t:"神秘的"},
+        {w:"monitor", p:"v.", t:"監測，密切注意"},
+        
+        // 片語
+        {w:"as well as", p:"phrase", t:"以及，還有"},
+        {w:"feel like", p:"phrase", t:"感覺"},
+        {w:"as a result", p:"phrase", t:"因此，結果"},
+        {w:"so that", p:"phrase", t:"以便，為了..."},
+        {w:"at the same time", p:"phrase", t:"同時"}
+    ];
+
+    let currentIndex = 0;
+    let mode = 'flashcard'; // flashcard or cloze
+
+    function setMode(m) {
+        mode = m;
+        document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById('nav-' + m).classList.add('active');
+        render();
+    }
+
+    function render() {
+        const container = document.getElementById('game-container');
+        const item = data[currentIndex];
+        
+        // 更新進度條
+        document.getElementById('stats').innerText = `進度: ${currentIndex + 1} / ${data.length}`;
+        container.innerHTML = '';
+
+        if (mode === 'flashcard') {
+            // 字卡模式
+            container.innerHTML = `
+                <div class="card-container" onclick="this.querySelector('.card').classList.toggle('flipped')">
+                    <div class="card">
+                        <div class="card-face card-front">
+                            <div class="word-text">${item.w}</div>
+                            <div class="pos-text">${item.p}</div>
+                            <div style="margin-top:20px; color:#999; font-size:14px;">(點擊翻面)</div>
+                        </div>
+                        <div class="card-face card-back">
+                            <div class="trans-text">${item.t}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // 拼字填空模式 (保留頭尾字母)
+            // 邏輯：保留第1個和最後1個字母，中間用底線表示。若是空格則保留空格。
+            let hint = item.w.split('').map((c, i) => {
+                if (c === ' ') return ' ';
+                if (i === 0 || i === item.w.length - 1) return c;
+                return '_';
+            }).join(' ');
+
+            container.innerHTML = `
+                <div class="cloze-box">
+                    <div style="color:#555; font-size:22px; margin-bottom:10px;">${item.t}</div>
+                    <div class="hint-text">${hint}</div>
+                    <input type="text" id="userInput" placeholder="請輸入完整單字" autocomplete="off" onkeypress="handleEnter(event)">
+                    <button class="btn-control" onclick="check()" style="width:100%; margin-top:10px; background:var(--secondary);">檢查</button>
+                    <div id="feedback" style="height:20px; color:#e74c3c; font-weight:bold;"></div>
+                </div>
+            `;
+            // 自動聚焦輸入框
+            setTimeout(() => document.getElementById('userInput').focus(), 100);
+        }
+    }
+
+    function check() {
+        const input = document.getElementById('userInput');
+        const feedback = document.getElementById('feedback');
+        const correct = data[currentIndex].w.toLowerCase().trim();
+        const val = input.value.toLowerCase().trim();
+
+        if (val === correct) {
+            input.classList.remove('wrong');
+            input.classList.add('correct');
+            feedback.style.color = 'var(--secondary)';
+            feedback.innerText = '✨ 正確！';
+            setTimeout(next, 600);
+        } else {
+            input.classList.add('wrong');
+            feedback.style.color = '#e74c3c';
+            feedback.innerText = '再試一次！(提示: ' + data[currentIndex].w + ')';
+        }
+    }
+
+    function handleEnter(e) { if (e.key === 'Enter') check(); }
+    
+    function next() {
+        if (currentIndex < data.length - 1) {
+            currentIndex++;
+            render();
+        } else {
+            alert("恭喜！所有單字都複習完一輪了！");
+        }
+    }
+
+    function prev() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            render();
+        }
+    }
+
+    function shuffle() {
+        data.sort(() => Math.random() - 0.5);
+        currentIndex = 0;
+        render();
+    }
+
+    // 初始化
+    render();
+</script>
+
+</body>
+</html>
